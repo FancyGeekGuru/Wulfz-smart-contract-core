@@ -9,19 +9,6 @@ import "./Awoo.sol";
 
 interface IWulfz {
     function getWulfzType(uint256 _tokenId) external view returns (uint256);
-
-    function balanceOf(address _user) external view returns (uint256);
-
-    function safeTransferFrom(
-        address _from,
-        address _to,
-        uint256 _tokenId
-    ) external;
-
-    function tokenOfOwnerByIndex(address _user, uint256 _index)
-        external
-        view
-        returns (uint256);
 }
 
 contract StakingPool is IERC721Receiver, Ownable {
@@ -34,7 +21,6 @@ contract StakingPool is IERC721Receiver, Ownable {
 
     IWulfz private _wulfzContract;
     UtilityToken private _utilityToken;
-    string private _privateKey;
 
     struct TokenInfo {
         uint256 reward;
@@ -62,22 +48,11 @@ contract StakingPool is IERC721Receiver, Ownable {
         _utilityToken = UtilityToken(_addr);
     }
 
-    function startStaking(
-        address _user,
-        uint256 _tokenId,
-        bytes32 hashInput
-    ) external masterContract {
-        require(
-            verify(
-                abi.encodePacked(
-                    _tokenId,
-                    _wulfzContract.getWulfzType(_tokenId)
-                ),
-                hashInput
-            ),
-            "Invalid action."
-        );
-
+    function startStaking(address _user, uint256 _tokenId)
+        external
+        masterContract
+    {
+        require(!stakedWulfz[msg.sender].contains(_tokenId), "Already staked");
         stakedWulfzInfo[_tokenId].lastUpdateTimeStamp = block.timestamp;
         stakedWulfz[msg.sender].add(_tokenId);
 
@@ -88,7 +63,14 @@ contract StakingPool is IERC721Receiver, Ownable {
         external
         masterContract
     {
+        require(
+            stakedWulfz[msg.sender].contains(_tokenId),
+            "You're not the owner"
+        );
+        delete stakedWulfzInfo[_tokenId];
+        stakedWulfz[_user].remove(_tokenId);
         updateReward(_tokenId);
+
         emit StakeStopped(_user, _tokenId);
     }
 
@@ -103,12 +85,11 @@ contract StakingPool is IERC721Receiver, Ownable {
     }
 
     function getClaimableToken(address _user) public returns (uint256) {
-        uint256 ownedCount = _wulfzContract.balanceOf(_user);
+        uint256[] memory tokens = stakedTokensOf(_user);
         uint256 totalAmount = 0;
 
-        for (uint256 i = 0; i < ownedCount; i++) {
-            uint256 _tokenId = _wulfzContract.tokenOfOwnerByIndex(_user, i);
-            totalAmount += updateReward(_tokenId);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            totalAmount += updateReward(tokens[i]);
         }
 
         return totalAmount;
@@ -119,18 +100,8 @@ contract StakingPool is IERC721Receiver, Ownable {
         _utilityToken.reward(_user, reward);
     }
 
-    // verify if the input values is valid
-    function verify(bytes memory input, bytes32 hashInput)
-        private
-        view
-        returns (bool)
-    {
-        return hashInput == sha256(abi.encodePacked(input, _privateKey));
-    }
-
-    /* get staked ship list of a staker */
     function stakedTokensOf(address _user)
-        external
+        public
         view
         returns (uint256[] memory)
     {
@@ -139,10 +110,6 @@ contract StakingPool is IERC721Receiver, Ownable {
             tokens[i] = stakedWulfz[_user].at(i);
         }
         return tokens;
-    }
-
-    function setSecret(string memory _sec) external onlyOwner {
-        _privateKey = _sec;
     }
 
     /**
