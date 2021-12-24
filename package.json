@@ -12,12 +12,14 @@
 	"author": "SmartDev0075",
 	"license": "MIT",
 	"dependencies": {
-		"@openzeppelin/contracts": "^4.4.0",
+		"@openzeppelin/contracts": "^4.4.1",
+		"@openzeppelin/test-helpers": "^0.5.15",
 		"@truffle/hdwallet-provider": "^2.0.0",
 		"chai": "^4.3.4",
 		"chai-as-promised": "^7.1.1",
 		"keccak256": "^1.0.6",
 		"merkletreejs": "^0.2.27",
+		"truffle-plugin-verify": "^0.5.20",
 		"web3": "^1.6.1"
 	}
 }

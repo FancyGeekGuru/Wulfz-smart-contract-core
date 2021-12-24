@@ -16,18 +16,19 @@ contract StakingPool is IERC721Receiver, Ownable {
 
     event StakeStarted(address indexed user, uint256 indexed tokenId);
     event StakeStopped(address indexed user, uint256 indexed tokenId);
+    event UtilityAddrSet(address from, address addr);
 
     uint256[] private STAKE_REWARD_BY_TYPE = [10, 5, 50];
 
     IWulfz private _wulfzContract;
     UtilityToken private _utilityToken;
 
-    struct TokenInfo {
-        uint256 reward;
-        uint256 lastUpdateTimeStamp;
+    struct StakedInfo {
+        uint256 wType;
+        uint256 lastUpdate;
     }
 
-    mapping(uint256 => TokenInfo) private stakedWulfzInfo;
+    mapping(uint256 => StakedInfo) private tokenInfo;
     mapping(address => EnumerableSet.UintSet) private stakedWulfz;
 
     modifier masterContract() {
@@ -35,26 +36,27 @@ contract StakingPool is IERC721Receiver, Ownable {
         _;
     }
 
-    constructor(address _wulfzAddr, address _awoo) {
+    constructor(address _wulfzAddr) {
         _wulfzContract = IWulfz(_wulfzAddr);
-        _utilityToken = UtilityToken(_awoo);
     }
 
-    function setPoolAddress(address _addr) external onlyOwner {
+    function setMasterContract(address _addr) external onlyOwner {
         _wulfzContract = IWulfz(_addr);
     }
 
     function setUtilitytoken(address _addr) external onlyOwner {
         _utilityToken = UtilityToken(_addr);
+        emit UtilityAddrSet(address(this), _addr);
     }
 
     function startStaking(address _user, uint256 _tokenId)
         external
         masterContract
     {
-        require(!stakedWulfz[msg.sender].contains(_tokenId), "Already staked");
-        stakedWulfzInfo[_tokenId].lastUpdateTimeStamp = block.timestamp;
-        stakedWulfz[msg.sender].add(_tokenId);
+        require(!stakedWulfz[_user].contains(_tokenId), "Already staked");
+        tokenInfo[_tokenId].wType = _wulfzContract.getWulfzType(_tokenId);
+        tokenInfo[_tokenId].lastUpdate = block.timestamp;
+        stakedWulfz[_user].add(_tokenId);
 
         emit StakeStarted(_user, _tokenId);
     }
@@ -63,41 +65,21 @@ contract StakingPool is IERC721Receiver, Ownable {
         external
         masterContract
     {
-        require(
-            stakedWulfz[msg.sender].contains(_tokenId),
-            "You're not the owner"
-        );
-        delete stakedWulfzInfo[_tokenId];
+        require(stakedWulfz[_user].contains(_tokenId), "You're not the owner");
+
+        uint256 wType = tokenInfo[_tokenId].wType;
+        uint256 rewardBase = STAKE_REWARD_BY_TYPE[wType];
+        uint256 interval = block.timestamp - tokenInfo[_tokenId].lastUpdate;
+        uint256 reward = ((rewardBase * interval) / 86400) *
+            (10**_utilityToken.decimals());
+
+        // require(wType != 0, "asdf");
+
+        _utilityToken.reward(_user, reward);
+        delete tokenInfo[_tokenId];
         stakedWulfz[_user].remove(_tokenId);
-        updateReward(_tokenId);
 
         emit StakeStopped(_user, _tokenId);
-    }
-
-    function updateReward(uint256 _tokenId) internal returns (uint256) {
-        uint256 wType = _wulfzContract.getWulfzType(_tokenId);
-        uint256 rewardBase = STAKE_REWARD_BY_TYPE[wType];
-        uint256 interval = block.timestamp -
-            stakedWulfzInfo[_tokenId].lastUpdateTimeStamp;
-
-        stakedWulfzInfo[_tokenId].reward += (rewardBase * interval) / 86400;
-        return stakedWulfzInfo[_tokenId].reward;
-    }
-
-    function getClaimableToken(address _user) public returns (uint256) {
-        uint256[] memory tokens = stakedTokensOf(_user);
-        uint256 totalAmount = 0;
-
-        for (uint256 i = 0; i < tokens.length; i++) {
-            totalAmount += updateReward(tokens[i]);
-        }
-
-        return totalAmount;
-    }
-
-    function getRewards(address _user) external {
-        uint256 reward = getClaimableToken(_user);
-        _utilityToken.reward(_user, reward);
     }
 
     function stakedTokensOf(address _user)
@@ -110,6 +92,32 @@ contract StakingPool is IERC721Receiver, Ownable {
             tokens[i] = stakedWulfz[_user].at(i);
         }
         return tokens;
+    }
+
+    function getClaimableToken(address _user) public view returns (uint256) {
+        uint256[] memory tokens = stakedTokensOf(_user);
+        uint256 totalAmount = 0;
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            uint256 wType = tokenInfo[tokens[i]].wType;
+            uint256 rewardBase = STAKE_REWARD_BY_TYPE[wType];
+            uint256 interval = block.timestamp -
+                tokenInfo[tokens[i]].lastUpdate;
+            uint256 reward = ((rewardBase * interval) / 86400) *
+                (10**_utilityToken.decimals());
+
+            totalAmount += reward;
+        }
+
+        return totalAmount;
+    }
+
+    function getReward(address _user) external {
+        _utilityToken.reward(_user, getClaimableToken(_user));
+        for (uint256 i = 0; i < stakedWulfz[_user].length(); i++) {
+            uint256 tokenId = stakedWulfz[_user].at(i);
+            tokenInfo[tokenId].lastUpdate = block.timestamp;
+        }
     }
 
     /**

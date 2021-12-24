@@ -21,7 +21,7 @@
 const HDWalletProvider = require("@truffle/hdwallet-provider")
 
 const fs = require("fs")
-// const mnemonic = fs.readFileSync("secretKey").toString().trim()
+const mnemonic = fs.readFileSync("secretKey").toString().trim()
 
 module.exports = {
 	/**
@@ -50,10 +50,9 @@ module.exports = {
 			provider: () =>
 				new HDWalletProvider(
 					mnemonic,
-					`https://rinkeby.infura.io/v3/9bcc209ec6ca45d0805a63edbc1a11c0`
+					`https://rinkeby.infura.io/v3/5b47694285464afc8725d1fdd74b1e8e`
 				),
 			network_id: 4, // Ropsten's id
-			gas: 5500000,
 		},
 		// Another network with more advanced options...
 		// advanced: {

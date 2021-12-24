@@ -26,6 +26,8 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         uint256 indexed tokenId,
         uint256 indexed wType
     );
+    event PoolAddrSet(address from, address addr);
+    event UtilityAddrSet(address from, address addr);
 
     uint256 public constant MINT_PRICE = 80000000000000000; // 0.08 ETH
     uint256 public constant BREED_PRICE = 600;
@@ -48,7 +50,7 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
     mapping(address => uint256) private claimInPublicSale; // userAddress => uint256
 
     string public _baseTokenURI =
-        "https://ipfs.io/ipfs/QmerhyiggKaU6GMgLyVxi9sw7BcBGYzthgFs5zVAH5w9xQ/";
+        "https://ipfs.io/ipfs/QmWDpfhQ3SgGxhe79pRvskhHcZZiRZMZJAGaBvZnphgac7";
 
     UtilityToken private _utilityToken; // AWOO utility token contract
     StakingPool private _pool;
@@ -63,9 +65,9 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         _startTimeOfEvolve = 1654056000; // Wed Jun 01 2022 00:00:00 GMT-0400 (Eastern Daylight Time)
 
         // first 55 tokens
-        // for (uint256 i = 0; i < 55; i++) {
-        //     mintOne(WulfzType.Genesis);
-        // }
+        for (uint256 i = 0; i < 55; i++) {
+            mintOne(WulfzType.Genesis);
+        }
     }
 
     /**
@@ -114,7 +116,7 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
             "You've already mint token. If you want more, you can mint during Public Sale"
         );
 
-        bytes32 merkleTreeRoot = 0xc8f014712fe82fef4018b76d7a839027b82b25fd876b3a2a22e4070ecfc2833f;
+        bytes32 merkleTreeRoot = 0x7ab97bc5f1482b951eccaf703af9f9be125c44c5483a56581a1875292861c468;
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(
             MerkleProof.verify(_proof, merkleTreeRoot, leaf),
@@ -171,10 +173,12 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
 
     function setUtilitytoken(address _addr) external onlyOwner {
         _utilityToken = UtilityToken(_addr);
+        emit UtilityAddrSet(address(this), _addr);
     }
 
     function setStakingPool(address _addr) external onlyOwner {
         _pool = StakingPool(_addr);
+        emit PoolAddrSet(address(this), _addr);
     }
 
     function setStartTimeOfPrivateSale(uint256 _timeStamp) external onlyOwner {
@@ -193,10 +197,10 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
     }
 
     function startStaking(uint256 _tokenId) external {
-        require(
-            block.timestamp > _startTimeOfStaking,
-            "Staking Mechanism is not started yet"
-        );
+        // require(
+        //     block.timestamp > _startTimeOfStaking,
+        //     "Staking Mechanism is not started yet"
+        // );
         require(ownerOf(_tokenId) == msg.sender);
         require(
             !wulfz[_tokenId].bStaked,
@@ -209,7 +213,7 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
     }
 
     function stopStaking(uint256 _tokenId) external {
-        require(ownerOf(_tokenId) == msg.sender);
+        // require(ownerOf(_tokenId) == msg.sender, "owner not matched");
         require(
             wulfz[_tokenId].bStaked,
             "This token hasn't ever been staked yet."
@@ -302,6 +306,10 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         override
     {
         require(ownerOf(_tokenId) == msg.sender);
+        require(
+            !wulfz[_tokenId].bStaked,
+            "This Token is already staked. Please try another token."
+        );
         super.changeName(_tokenId, newName);
 
         _utilityToken.burn(msg.sender, NAME_CHANGE_PRICE);

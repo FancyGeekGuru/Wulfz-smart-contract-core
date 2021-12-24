@@ -9,44 +9,34 @@ contract UtilityToken is ERC20("Awoo", "AWOO"), Ownable {
     event AwooBurn(address indexed user, uint256 amount);
     event AwooRewarded(address indexed user, uint256 amount);
 
-    uint8 public _decimals = 2;
     uint256 public constant TOTAL_SUPPLY_AWOO = 200000000 * 10**2;
 
     address private _wulfzAddr;
     address private _stakingAddr;
-
-    modifier masterContract() {
-        require(msg.sender == _wulfzAddr);
-        _;
-    }
-
-    modifier stakingContract() {
-        require(msg.sender == _stakingAddr);
-        _;
-    }
 
     constructor(address wulfzAddr_, address stakingAddr_) {
         _wulfzAddr = wulfzAddr_;
         _stakingAddr = stakingAddr_;
     }
 
-    function tokenAmount(uint256 _amount) internal view returns (uint256) {
-        require(_amount != 0, "Amount is zero");
-        return _amount * 10**_decimals;
+    function decimals() public pure override returns (uint8) {
+        return 2;
     }
 
-    function burn(address _from, uint256 _amount) external masterContract {
-        _burn(_from, tokenAmount(_amount));
+    function burn(address _from, uint256 _amount) external {
+        require(msg.sender == _wulfzAddr);
+        _burn(_from, _amount);
         emit AwooBurn(_from, _amount);
     }
 
-    function reward(address _to, uint256 _amount) external stakingContract {
+    function reward(address _to, uint256 _amount) external {
+        require(msg.sender == _stakingAddr);
         if (_amount > 0) {
             require(
-                (totalSupply() + tokenAmount(_amount)) < TOTAL_SUPPLY_AWOO,
+                (totalSupply() + _amount) < TOTAL_SUPPLY_AWOO,
                 "MAX LIMIT SUPPLY EXCEEDED"
             );
-            _mint(_to, tokenAmount(_amount));
+            _mint(_to, _amount);
             emit AwooRewarded(_to, _amount);
         }
     }
