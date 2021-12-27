@@ -24,13 +24,13 @@ contract UtilityToken is ERC20("Awoo", "AWOO"), Ownable {
     }
 
     function burn(address _from, uint256 _amount) external {
-        require(msg.sender == _wulfzAddr);
+        require(msg.sender == _wulfzAddr, "Only Wulfz Contract can call");
         _burn(_from, _amount);
         emit AwooBurn(_from, _amount);
     }
 
     function reward(address _to, uint256 _amount) external {
-        require(msg.sender == _stakingAddr);
+        require(msg.sender == _stakingAddr, "Only Staking Contract can call");
         if (_amount > 0) {
             require(
                 (totalSupply() + _amount) < TOTAL_SUPPLY_AWOO,

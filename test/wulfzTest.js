@@ -47,13 +47,21 @@ contract("WulfzNFT", (accounts) => {
 			assert.notEqual(awooAddr, undefined)
 
 			let res = await contract.setStakingPool(poolAddr)
-			assert(res.logs[0].args.addr, poolAddr, "pool address not matched")
+			assert.equal(
+				res.logs[0].args.addr,
+				poolAddr,
+				"pool address not matched"
+			)
 
 			res = await contract.setUtilitytoken(awooAddr)
-			assert(res.logs[0].args.addr, awooAddr, "awoo address not matched")
+			assert.equal(
+				res.logs[0].args.addr,
+				awooAddr,
+				"awoo address not matched"
+			)
 
 			res = await stakingPool.setUtilitytoken(awooAddr)
-			assert(
+			assert.equal(
 				res.logs[0].args.addr,
 				awooAddr,
 				"awoo address not matched, from Pool"
@@ -63,16 +71,16 @@ contract("WulfzNFT", (accounts) => {
 
 	describe("PreSale", async () => {
 		it("mint token during Private Sale", async () => {
-			// Increase time 7 days
-			// await time.increase(time.duration.days(6))
+			// time.increase(time.duration.days(300))
+			res = await contract.setStartTimeOfPrivateSale(1640483183)
 
 			let hexProof = [
-				"0x4375e4c5afa2155eb46491b7422fdccffcbf97a1858dd8143bf04f2db3673e52",
-				"0x4601f5318179a9c10466d135c0be6857271ff968184b8e37e101ac26d6c229fb",
-				"0x919d8549b7b5f1a92e99fb686d6b55335c7ff028e8c91e23b3070bcdf03c9ebd",
-				"0x62aab45490c7ccc20e4f9b3d26b486c0c17aad4aceed8b372f57fb1556b58421",
-				"0xe9df134f5f7cf04195f09f8d0a42e96bd86b6a209963ec2235d8f21ee5d5b76e",
-				"0x520bab349415f38b8bf2bc796a7101a5d722c68b2b362762f72e1c8d9e91f267",
+				"0xb6dceb479a7f07d4560060ea61e3c12b9179e743907c41782d4c44e447e40b80",
+				"0x1b08affd584aa53b53641e24a394c5d3f4ada317485b83437461615b0c0482e7",
+				"0xae7faffe640e109f11b91192382e6ef2d7f097aa450d12d6f1e6fbf5a862df79",
+				"0x35f9c1cc6df07643ba0e429063a70060a4287693a7452a05ebb50161e1f15c38",
+				"0x9d99935702291efd6bfde6db8f2120f7a7084b62bca42f7296aeeaa7efdc4a11",
+				"0x7a72338241af2cbb12960d171961d8217d58a8d4d042d90ca18089c8d9445b8c",
 			]
 
 			const result = await contract.Presale(hexProof, {
@@ -99,14 +107,16 @@ contract("WulfzNFT", (accounts) => {
 
 	describe("PublicSale", async () => {
 		it("mint token during Public Sale", async () => {
+			res = await contract.setStartTimeOfPublicSale(1640483183)
+
 			let res1 = await contract.PublicSale(2, {
 				from: bob,
 				value: 160000000000000000,
 			})
 
 			res1 = res1.logs[3].args
-			assert(res1.user, bob, "user mismatched")
-			assert(res1.tokenId, 3, "tokenId mismatched")
+			assert.equal(res1.user, bob, "user mismatched")
+			assert.equal(res1.tokenId, 3, "tokenId mismatched")
 
 			let res2 = await contract.PublicSale(1, {
 				from: cat,
@@ -114,8 +124,8 @@ contract("WulfzNFT", (accounts) => {
 			})
 
 			res2 = res2.logs[1].args
-			assert(res2.user, cat, "user mismatched")
-			assert(res2.tokenId, 4, "tokenId mismatched")
+			assert.equal(res2.user, cat, "user mismatched")
+			assert.equal(res2.tokenId, 4, "tokenId mismatched")
 
 			contract.PublicSale(3, {
 				from: alice,
@@ -131,6 +141,7 @@ contract("WulfzNFT", (accounts) => {
 
 	describe("Staking", async () => {
 		it("Stake Wulfz", async () => {
+			res = await contract.setStakingTime(1640483183)
 			contract.startStaking(3, { from: alice }).should.be.rejected
 
 			await contract.startStaking(3, { from: bob })
@@ -159,11 +170,12 @@ contract("WulfzNFT", (accounts) => {
 			// res = await stakingPool.stakedTokensOf(bob)
 			// console.log(res)
 
-			// console.log(await utilityToken.balanceOf(bob))
+			res = await utilityToken.balanceOf(bob)
+			console.log(res.toNumber())
 			// console.log(await utilityToken.decimals())
 		})
 		it("Get Reward", async () => {
-			time.increase(time.duration.days(100))
+			time.increase(time.duration.days(120))
 			await stakingPool.getReward(bob)
 			// console.log(await utilityToken.balanceOf(bob))
 
@@ -171,12 +183,91 @@ contract("WulfzNFT", (accounts) => {
 				from: bob,
 			}).should.be.rejected
 
+			time.increase(time.duration.hours(5))
+
 			await contract.stopStaking(3, {
 				from: bob,
 			})
 
 			time.increase(time.duration.days(100))
-			stakingPool.getReward(bob).should.be.rejected
+			await stakingPool.getReward(bob)
+
+			res = await utilityToken.balanceOf(bob)
+			console.log(res.toNumber())
+		})
+	})
+
+	describe("Adoption", async () => {
+		it("adopting", async () => {
+			contract.setAdoptTime(1640023200)
+			res = await contract.isAdoptionStart()
+			res = await contract.canAdopt(3, { from: bob })
+			// console.log(res)
+			res = await contract.adopt(3, { from: bob })
+			console.log((await utilityToken.balanceOf(bob)).toNumber())
+			console.log((await contract.tokenOfOwnerByIndex(bob, 2)).toNumber())
+			assert.equal(res.logs[1].args.tokenId, 6001, "Pupz Id mismatched")
+		})
+
+		it("cooldown test", async () => {
+			time.increase(time.duration.days(10))
+			await contract.adopt(3, { from: bob }).should.be.rejected
+
+			time.increase(time.duration.days(5))
+			res = await contract.adopt(3, { from: bob })
+			assert.equal(res.logs[1].args.tokenId, 6002, "Pupz Id mismatched")
+		})
+
+		it("awoo burn test", async () => {})
+	})
+
+	describe("Evolution", async () => {
+		it("evolution", async () => {
+			contract.setEvolveTime(1640023200)
+			await contract.evolve(6002, { from: bob }).should.be.rejected
+			await contract.startStaking(1, { from: alice })
+			time.increase(time.duration.days(300))
+			await stakingPool.getReward(alice)
+			await contract.stopStaking(1, { from: alice })
+
+			res = await contract.evolve(1, { from: alice })
+			assert.equal(res.logs[3].args.tokenId, 5601, "Alpha Id mismatched")
+			assert.equal(res.logs[3].args.wType, 2, "Alpha type mismatched")
+			console.log((await utilityToken.balanceOf(alice)).toNumber())
+			console.log((await contract.balanceOf(alice)).toNumber())
+			console.log(
+				(await contract.tokenOfOwnerByIndex(alice, 0)).toNumber()
+			)
+			await contract.tokenOfOwnerByIndex(alice, 1).should.be.rejected
+
+			await contract.adopt(5601, { from: alice })
+			time.increase(time.duration.days(8))
+			await contract.adopt(5601, { from: alice })
+			console.log((await utilityToken.balanceOf(alice)).toNumber())
+			console.log((await contract.balanceOf(alice)).toNumber())
+		})
+
+		it("awoo & Wulfz burn test 1500", async () => {})
+	})
+
+	describe("Change Name & Bio", async () => {
+		it("change name", async () => {
+			await contract.changeName(5601, "SUPERHIRO", { from: alice })
+			console.log(await contract.isNameReserved("SUPERHIRO"))
+		})
+
+		it("change bio", async () => {
+			console.log((await utilityToken.balanceOf(alice)).toNumber())
+			await contract.changeBio(6001, "I am the first Pupz", { from: bob })
+				.should.be.rejected
+			await contract.changeBio(
+				5601,
+				"I am the first Genesis having bio",
+				{
+					from: alice,
+				}
+			)
+			console.log((await utilityToken.balanceOf(alice)).toNumber())
 		})
 	})
 })

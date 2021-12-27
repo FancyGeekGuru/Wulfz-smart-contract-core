@@ -14,7 +14,7 @@ const tree = new MerkleTree(leafNodes, keccak256, { sortPairs: true })
 console.log(tree.getHexRoot())
 // console.log(tree.getRoot())
 
-const claimingAddress = leafNodes[1]
+const claimingAddress = leafNodes[0]
 const hexProof = tree.getHexProof(claimingAddress)
 
 console.log(hexProof)

@@ -9,7 +9,9 @@ module.exports = async (deployer) => {
 
 	await deployer.deploy(StakingPool, WulfzContract.address)
 	const StakingContract = await StakingPool.deployed()
+	await WulfzContract.setStakingPool(StakingContract.address)
 
 	await deployer.deploy(AWOO, WulfzContract.address, StakingContract.address)
 	const AwooContract = await AWOO.deployed()
+	await WulfzContract.setUtilitytoken(AwooContract.address)
 }

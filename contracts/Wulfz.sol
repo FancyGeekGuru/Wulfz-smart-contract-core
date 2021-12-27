@@ -26,6 +26,13 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         uint256 indexed tokenId,
         uint256 indexed wType
     );
+
+    event StakingTimeChanged(uint256 newTime, uint256 currentTime);
+    event EvolveTimeChanged(uint256 newTime, uint256 currentTime);
+    event AdoptionTimeChanged(uint256 newTime, uint256 currentTime);
+
+    event PreSaleTimeChanged(uint256 newTime, uint256 currentTime);
+    event PublicSaleTimeChanged(uint256 newTime, uint256 currentTime);
     event PoolAddrSet(address from, address addr);
     event UtilityAddrSet(address from, address addr);
 
@@ -50,7 +57,7 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
     mapping(address => uint256) private claimInPublicSale; // userAddress => uint256
 
     string public _baseTokenURI =
-        "https://ipfs.io/ipfs/QmWDpfhQ3SgGxhe79pRvskhHcZZiRZMZJAGaBvZnphgac7";
+        "https://ipfs.io/ipfs/QmQc13v4Q9JGQED2nrV1gjvCu9zYedWjHPfo5iW2TgYWdm/";
 
     UtilityToken private _utilityToken; // AWOO utility token contract
     StakingPool private _pool;
@@ -64,10 +71,10 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         _startTimeOfAdopt = 1646110800; // Tue Mar 01 2022 00:00:00 GMT-0500 (Eastern Standard Time)
         _startTimeOfEvolve = 1654056000; // Wed Jun 01 2022 00:00:00 GMT-0400 (Eastern Daylight Time)
 
-        // first 55 tokens
-        for (uint256 i = 0; i < 55; i++) {
-            mintOne(WulfzType.Genesis);
-        }
+        // 55 Wulfz will be held in the Vault for Promotional purposes
+        // for (uint256 i = 0; i < 55; i++) {
+        //     mintOne(WulfzType.Genesis);
+        // }
     }
 
     /**
@@ -102,29 +109,30 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
      */
     function Presale(bytes32[] calldata _proof) external payable {
         require(msg.value >= MINT_PRICE, "Minting Price is not enough");
-        // require(
-        //     block.timestamp > _startTimeOfPrivateSale,
-        //     "Private Sale is not started yet"
-        // );
-        // require(
-        //     block.timestamp < _startTimeOfPrivateSale + 86400,
-        //     "Private Sale is already ended"
-        // );
+        require(
+            block.timestamp > _startTimeOfPrivateSale,
+            "Private Sale is not started yet"
+        );
+        require(
+            block.timestamp < _startTimeOfPrivateSale + 86400,
+            "Private Sale is already ended"
+        );
 
         require(
             !claimInPresale[msg.sender],
             "You've already mint token. If you want more, you can mint during Public Sale"
         );
 
-        bytes32 merkleTreeRoot = 0x7ab97bc5f1482b951eccaf703af9f9be125c44c5483a56581a1875292861c468;
+        // 5368 customers are whitelisted
+        bytes32 merkleTreeRoot = 0x12b1013fe853dea282b3440a70e5d739b7ef75e135122659fe5408bde23a4cc1;
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(
             MerkleProof.verify(_proof, merkleTreeRoot, leaf),
             "Sorry, you're not whitelisted. Please try Public Sale"
         );
 
-        mintOne(WulfzType.Genesis);
         claimInPresale[msg.sender] = true;
+        mintOne(WulfzType.Genesis);
     }
 
     /**
@@ -136,27 +144,28 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
             msg.value >= MINT_PRICE * _amount,
             "Minting Price is not enough"
         );
-        // require(
-        //     block.timestamp > _startTimeOfPublicSale,
-        //     "Public Sale is not started yet"
-        // );
-        // require(
-        //     block.timestamp < _startTimeOfPublicSale + 86400,
-        //     "Public Sale is already ended"
-        // );
+        require(
+            block.timestamp > _startTimeOfPublicSale,
+            "Public Sale is not started yet"
+        );
+        require(
+            block.timestamp < _startTimeOfPublicSale + 86400,
+            "Public Sale is already ended"
+        );
         require(_amount < 3, "You can only require at most 2");
         require(
             claimInPublicSale[msg.sender] < 3,
             "You can only possess at most 2"
         );
 
+        claimInPublicSale[msg.sender] += _amount;
         for (uint256 i = 0; i < _amount; i++) {
             mintOne(WulfzType.Genesis);
-            claimInPublicSale[msg.sender]++;
         }
     }
 
     function mintOne(WulfzType _type) private {
+        require(msg.sender == tx.origin);
         require(
             totalSupplyByType[uint256(_type)] <
                 MAX_SUPPLY_BY_TYPE[uint256(_type)],
@@ -183,10 +192,12 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
 
     function setStartTimeOfPrivateSale(uint256 _timeStamp) external onlyOwner {
         _startTimeOfPrivateSale = _timeStamp;
+        emit PreSaleTimeChanged(_startTimeOfPrivateSale, block.timestamp);
     }
 
     function setStartTimeOfPublicSale(uint256 _timeStamp) external onlyOwner {
         _startTimeOfPublicSale = _timeStamp;
+        emit PublicSaleTimeChanged(_startTimeOfPublicSale, block.timestamp);
     }
 
     /*******************************************************************************
@@ -194,14 +205,15 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
      ******************************************************************************** */
     function setStakingTime(uint256 _timeStamp) external onlyOwner {
         _startTimeOfStaking = _timeStamp;
+        emit StakingTimeChanged(_startTimeOfStaking, block.timestamp);
     }
 
     function startStaking(uint256 _tokenId) external {
-        // require(
-        //     block.timestamp > _startTimeOfStaking,
-        //     "Staking Mechanism is not started yet"
-        // );
-        require(ownerOf(_tokenId) == msg.sender);
+        require(
+            block.timestamp > _startTimeOfStaking,
+            "Staking Mechanism is not started yet"
+        );
+        require(ownerOf(_tokenId) == msg.sender, "Staking: owner not matched");
         require(
             !wulfz[_tokenId].bStaked,
             "This Token is already staked. Please try another token."
@@ -213,7 +225,6 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
     }
 
     function stopStaking(uint256 _tokenId) external {
-        // require(ownerOf(_tokenId) == msg.sender, "owner not matched");
         require(
             wulfz[_tokenId].bStaked,
             "This token hasn't ever been staked yet."
@@ -228,6 +239,7 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
      ********************************************************************************/
     function setAdoptTime(uint256 _timeStamp) external onlyOwner {
         _startTimeOfAdopt = _timeStamp;
+        emit AdoptionTimeChanged(_startTimeOfAdopt, block.timestamp);
     }
 
     function canAdopt(uint256 _tokenId) public view returns (bool) {
@@ -256,17 +268,20 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         require(isAdoptionStart(), "Adopting Pupz is not ready yet");
         require(
             ownerOf(_parent) == msg.sender,
-            "You're not owner of this token"
+            "Adopting: You're not owner of this token"
         );
         require(
             !wulfz[_parent].bStaked,
             "This Token is already staked. Please try another token."
         );
 
+        _utilityToken.burn(
+            msg.sender,
+            BREED_PRICE * (10**_utilityToken.decimals())
+        );
+
         mintOne(WulfzType.Pupz);
         wulfz[_parent].lastBreedTime = block.timestamp;
-
-        _utilityToken.burn(msg.sender, BREED_PRICE);
     }
 
     /*******************************************************************************
@@ -274,6 +289,7 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
      ********************************************************************************/
     function setEvolveTime(uint256 _timeStamp) external onlyOwner {
         _startTimeOfEvolve = _timeStamp;
+        emit EvolveTimeChanged(_startTimeOfEvolve, block.timestamp);
     }
 
     function isEvolveStart() public view returns (bool) {
@@ -284,18 +300,24 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         require(isEvolveStart(), "Evolving Wulfz is not ready yet");
         require(
             ownerOf(_tokenId) == msg.sender,
-            "You're not owner of this token"
+            "Evolve: You're not owner of this token"
         );
-        require(wulfz[_tokenId].wType == WulfzType.Genesis);
+        require(
+            wulfz[_tokenId].wType == WulfzType.Genesis,
+            "Genesis can only evolve Alpha"
+        );
         require(
             !wulfz[_tokenId].bStaked,
             "This Token is already staked. Please try another token."
         );
 
+        _utilityToken.burn(
+            msg.sender,
+            EVOLVE_PRICE * (10**_utilityToken.decimals())
+        );
+
         _burn(_tokenId);
         mintOne(WulfzType.Alpha);
-
-        _utilityToken.burn(msg.sender, EVOLVE_PRICE);
     }
 
     /*******************************************************************************
@@ -305,20 +327,30 @@ contract WulfzNFT is IWulfzNFT, Profile, Ownable {
         public
         override
     {
-        require(ownerOf(_tokenId) == msg.sender);
+        require(
+            ownerOf(_tokenId) == msg.sender,
+            "ChangeName: you're not the owner"
+        );
         require(
             !wulfz[_tokenId].bStaked,
             "This Token is already staked. Please try another token."
         );
+        _utilityToken.burn(
+            msg.sender,
+            NAME_CHANGE_PRICE * (10**_utilityToken.decimals())
+        );
         super.changeName(_tokenId, newName);
-
-        _utilityToken.burn(msg.sender, NAME_CHANGE_PRICE);
     }
 
     function changeBio(uint256 _tokenId, string memory _bio) public override {
-        require(ownerOf(_tokenId) == msg.sender);
+        require(
+            ownerOf(_tokenId) == msg.sender,
+            "ChangeBio: you're not the owner"
+        );
+        _utilityToken.burn(
+            msg.sender,
+            BIO_CHANGE_PRICE * (10**_utilityToken.decimals())
+        );
         super.changeBio(_tokenId, _bio);
-
-        _utilityToken.burn(msg.sender, BIO_CHANGE_PRICE);
     }
 }

@@ -32,7 +32,10 @@ contract StakingPool is IERC721Receiver, Ownable {
     mapping(address => EnumerableSet.UintSet) private stakedWulfz;
 
     modifier masterContract() {
-        require(msg.sender == address(_wulfzContract));
+        require(
+            msg.sender == address(_wulfzContract),
+            "Master Contract can only call Staking Contract"
+        );
         _;
     }
 
@@ -70,10 +73,8 @@ contract StakingPool is IERC721Receiver, Ownable {
         uint256 wType = tokenInfo[_tokenId].wType;
         uint256 rewardBase = STAKE_REWARD_BY_TYPE[wType];
         uint256 interval = block.timestamp - tokenInfo[_tokenId].lastUpdate;
-        uint256 reward = ((rewardBase * interval) / 86400) *
-            (10**_utilityToken.decimals());
-
-        // require(wType != 0, "asdf");
+        uint256 reward = ((rewardBase * interval) *
+            10**_utilityToken.decimals()) / 86400;
 
         _utilityToken.reward(_user, reward);
         delete tokenInfo[_tokenId];
@@ -103,8 +104,8 @@ contract StakingPool is IERC721Receiver, Ownable {
             uint256 rewardBase = STAKE_REWARD_BY_TYPE[wType];
             uint256 interval = block.timestamp -
                 tokenInfo[tokens[i]].lastUpdate;
-            uint256 reward = ((rewardBase * interval) / 86400) *
-                (10**_utilityToken.decimals());
+            uint256 reward = ((rewardBase * interval) *
+                10**_utilityToken.decimals()) / 86400;
 
             totalAmount += reward;
         }
@@ -127,7 +128,7 @@ contract StakingPool is IERC721Receiver, Ownable {
     function onERC721Received(
         address, /*operator*/
         address, /*from*/
-        uint256, // tokenId
+        uint256, /* tokenId */
         bytes calldata /*data*/
     ) external view override returns (bytes4) {
         require(
